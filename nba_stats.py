@@ -11,6 +11,10 @@ class Control:
     w_dbpm = .6
     w_dts = .4
 
+ADV_DUPLICATES = [
+    "Rk", "Pos", "Age", "Tm", "G", "MP", "GS"
+]
+
 def build_url(season: int, table: str) -> str:
     if table == "per_game":
         return f"https://www.basketball-reference.com/leagues/NBA_{season}_per_game.html"
@@ -21,7 +25,7 @@ def read_table(url: str) -> pd.DataFrame:
     tables = pd.read_html(url)
     return tables[0]
 
-def load_data(season: int, sleep_s: float):
+def load_data(season: int, sleep_s: float = 0.0):
     per_game_url = build_url(season, "per_game")
     adv_url = build_url(season, "advanced")
 
@@ -32,6 +36,37 @@ def load_data(season: int, sleep_s: float):
         time.sleep(sleep_s)
 
     return per_game, advanced
+
+def merge_season(season: int) -> pd.DataFrame:
+    pg, adv = load_data(season, sleep_s=0.0)
+
+    pg["Season"] = season
+    adv["Season"] = season
+
+    adv_clean = adv.drop(
+        columns=[c for c in ADV_DUPLICATES if c in adv.columns],
+        errors="ignore"
+    )
+
+    merged = pd.merge(
+        pg,
+        adv_clean,
+        on=["Player", "Season"],
+        how="inner",
+    )
+    return merged
+
+def test_columns_no_duplicates():
+    df = merge_season(2024)
+
+    duplicates = df.columns[df.columns.duplicated()]
+    print("Duplicate columns:", list(duplicates))
+
+    cols = ["Player", "Pos", "Tm", "G", "PTS", "TS%", "BPM", "Season"]
+    cols = [c for c in cols if c in df.columns]
+    print("\nKey columns preview:")
+    print(df[cols].head())
+
 
 
 
@@ -48,4 +83,5 @@ def test_scrape_one_season() -> None:
 
 if __name__ == "__main__":
     test_scrape_one_season()
+    test_columns_no_duplicates()
 
