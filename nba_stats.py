@@ -4,21 +4,21 @@ import time
 import urllib.request
 import urllib.error
 import random
+import os
 from io import StringIO
 
 
 class Control:
-    start_year = 2021
+    start_year = 2018
     end_year = 2024
-    min_games = 65
-    size_plot = 15
     sleep = 3.0
-    w_dbpm = .6
-    w_dts = .4
 
 ADV_DUPLICATES = [
     "Rk", "Pos", "Age", "Tm", "G", "MP", "GS"
 ]
+
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def polite_sleep(base: float):
     time.sleep(base + random.uniform(0.5, 1.5))
@@ -86,50 +86,24 @@ def merge_season(season: int) -> pd.DataFrame:
     )
     return merged
 
-def build_total_dataset() -> pd.DataFrame:
-    all_seasons = []
-
+def build_season_csvs(csv_path="nba_master.csv"):
     for season in range(Control.start_year, Control.end_year + 1):
         print(f"Processing season {season}...")
-        df_season = merge_season(season)
-        all_seasons.append(df_season)
-        print("  rows:", len(df_season))
 
-    master = pd.concat(all_seasons, ignore_index=True)
-    print("\nMASTER shape:", master.shape)
-    return master
+        csv_path = os.path.join(
+            DATA_DIR,
+            f"nba_{season}_player_stats.csv"
+        )
 
-def test_columns_no_duplicates():
-    df = merge_season(2024)
+        if os.path.exists(csv_path):
+            continue
 
-    duplicates = df.columns[df.columns.duplicated()]
-    print("Duplicate columns:", list(duplicates))
-
-    cols = ["Player", "Pos", "Tm", "G", "PTS", "TS%", "BPM", "Season"]
-    cols = [c for c in cols if c in df.columns]
-    print("\nKey columns preview:")
-    print(df[cols].head())
-
-
-def test_scrape_one_season() -> None:
-    season = 2024
-    pg, adv = load_data(season, sleep_s=Control.sleep)
-
-    print("Per-game columns:", list(pg.columns))
-    print(pg[["Player", "G", "PTS"]].head())
-
-    print("\nAdvanced columns:", list(adv.columns))
-    print(adv[["Player", "TS%", "BPM"]].head())
-
-def test_master_dataset():
-    master = build_total_dataset()
-
-    print("\nColumns count:", len(master.columns))
-    print("First 15 columns:")
-    print(list(master.columns)[:15])
-
-    print("\nPreview rows:")
-    print(master.head())
+        try:
+            df_season = merge_season(season)
+            df_season.to_csv(csv_path, index=False)
+            print(f"  Saved {csv_path} ({len(df_season)} rows)")
+        except Exception as e:
+            print(f"  [FAILED] {season}: {e}")
 
 def points_improvement(master: pd.DataFrame):
     pts_df = master[["Player", "Season", "PTS"]].copy()
@@ -162,9 +136,6 @@ def player_improvement(master: pd.DataFrame):
 
 
 if __name__ == "__main__":
-
-    master = build_total_dataset()
-    points_improvement(master)
-    player_improvement(master)
+    build_season_csvs()
 
 
